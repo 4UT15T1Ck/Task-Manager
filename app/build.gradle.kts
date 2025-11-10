@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,18 +9,31 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
+
 android {
-    namespace = "com.app.taskmanager"
+    namespace = "com.nguyenmanhkien.taskmanager"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.app.taskmanager"
+        applicationId = "com.nguyenmanhkien.taskmanager"
         minSdk = 28
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "GOOGLE_CLIENT_ID",
+            "\"${localProperties.getProperty("GOOGLE_CLIENT_ID") ?: ""}\""
+        )
     }
 
     buildTypes {
@@ -37,6 +53,7 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
@@ -51,6 +68,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.googleid)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -75,7 +93,10 @@ dependencies {
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.contentnegotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.google.services.auth)
+    implementation(libs.ktor.client.logging)
+    implementation(libs.google.services.identity)
+    implementation(libs.androidx.credential)
+    implementation(libs.coil.compose)
     implementation(libs.androidx.workmanager.ktx)
     implementation(libs.kotlinx.serialization.json)
 }
