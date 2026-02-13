@@ -18,7 +18,7 @@ class DatabaseCallback(
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)
         scope.launch {
-            categoryDao.insertCategories(PredefinedCategories.list)
+            categoryDao.upsertCategories(PredefinedCategories.list)
         }
     }
 }

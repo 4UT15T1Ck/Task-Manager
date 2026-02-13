@@ -6,8 +6,6 @@ import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
 
-enum class ReminderStatus { PENDING, SENT, SNOOZED, FAILED }
-
 @Entity(
     tableName = Reminder.TABLE_NAME,
     foreignKeys = [

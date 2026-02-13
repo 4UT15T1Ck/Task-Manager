@@ -16,9 +16,6 @@ data class Category(
     @ColumnInfo(name = COLOR_COLUMN)
     val color: Int,
 
-    @ColumnInfo(name = REMOVABLE_COLUMN)
-    val isRemovable: Boolean = true,
-
     @ColumnInfo(name = SYNC_STATUS_COLUMN)
     val syncStatus: SyncStatus = SyncStatus.CREATED,
 
@@ -33,7 +30,6 @@ data class Category(
         const val ID_COLUMN = "_id"
         const val NAME_COLUMN = "name"
         const val COLOR_COLUMN = "color"
-        const val REMOVABLE_COLUMN = "removable"
         const val SYNC_STATUS_COLUMN = "sync_status"
         const val GOOGLE_TASK_LIST_ID_COLUMN = "google_task_list_id"
         const val CREATED_AT_COLUMN = "created_at"

@@ -12,7 +12,6 @@ import com.nguyenmanhkien.taskmanager.core.data.repository.UserPreferencesReposi
 import com.nguyenmanhkien.taskmanager.core.domain.repository.ApiPreferencesRepository
 import com.nguyenmanhkien.taskmanager.core.domain.repository.TaskPreferencesRepository
 import com.nguyenmanhkien.taskmanager.core.domain.repository.UserPreferencesRepository
-import com.nguyenmanhkien.taskmanager.features.tasks.data.local.seed.DatabaseCallback
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -37,11 +36,9 @@ class CoreFactoryModule {
 
     @Single
     fun createRoomDatabase(
-        context: Context,
-        databaseCallback: DatabaseCallback
+        context: Context
     ): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DB_NAME)
-            .addCallback(databaseCallback)
             .build()
     }
 

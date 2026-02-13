@@ -1,2 +1,70 @@
 package com.nguyenmanhkien.taskmanager.features.tasks.data.local.repository
 
+import com.nguyenmanhkien.taskmanager.features.tasks.data.local.dao.TaskDao
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.SyncStatus
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskStatus
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskWithSubtasks
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.repository.TaskRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+
+class TaskRepositoryImpl(
+    private val dao: TaskDao
+) : TaskRepository {
+
+    override fun getFilteredTasks(
+        categoryId: Int?,
+        startTime: Long?,
+        endTime: Long?,
+        searchQuery: String?
+    ): Flow<List<Task>> = dao.getFilteredTasks(categoryId, startTime, endTime, searchQuery)
+
+    override fun getTaskWithSubtasks(taskId: Int): Flow<TaskWithSubtasks?> {
+        return dao.getTaskByIdFlow(taskId)
+            .combine(dao.getSubtasksForTaskFlow(taskId)) { task, subtasks ->
+                if (task == null) null
+                else TaskWithSubtasks(task, subtasks)
+            }
+    }
+
+    override fun getTasksByStatus(status: TaskStatus): Flow<List<Task>> =
+        dao.getTasksByStatus(status)
+
+    override fun getTasksByPriority(priority: TaskPriority): Flow<List<Task>> =
+        dao.getTasksByPriority(priority)
+
+    override fun getTasksBySyncStatus(syncStatus: SyncStatus): Flow<List<Task>> =
+        dao.getTasksBySyncStatus(syncStatus)
+
+
+    override fun getDaysWithTasks(startTime: Long, endTime: Long): Flow<List<Long>> =
+        dao.getDaysWithTasksInRange(startTime, endTime)
+
+    override suspend fun getSubtasksOnce(taskId: Int): List<Task> =
+        dao.getSubtasksForTaskOnce(taskId)
+
+    override suspend fun getTaskById(id: Int): Task? = dao.getTaskById(id)
+
+    override suspend fun getTaskByGoogleId(googleId: Int): Task? =
+        dao.getTaskByGoogleCalendarEventId(googleId)
+
+    override suspend fun getOverdueInProgressIds(currentTime: Long): List<Int> =
+        dao.getOverdueInProgressTasks(currentTime)
+
+    override suspend fun upsertTask(task: Task) = dao.upsertTask(task)
+
+    override suspend fun upsertTasks(tasks: List<Task>) = dao.upsertTasks(tasks)
+
+    override suspend fun deleteTask(task: Task) = dao.deleteTask(task)
+
+    override suspend fun deleteTasks(tasks: List<Task>) = dao.deleteTasks(tasks)
+
+    override suspend fun updateStatus(id: Int, status: TaskStatus) = dao.setTaskStatus(id, status)
+
+    override suspend fun updatePriority(id: Int, priority: TaskPriority) = dao.setTaskPriority(id, priority)
+
+    override suspend fun updateSyncStatus(id: Int, syncStatus: SyncStatus) =
+        dao.setTaskSyncStatus(id, syncStatus)
+}

@@ -3,12 +3,8 @@ package com.nguyenmanhkien.taskmanager.features.tasks.domain.model
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
-
-enum class TaskStatus { IN_PROGRESS, COMPLETED, PAST_DUE }
-enum class TaskPriority { NO_PRIORITY, LOW, MEDIUM, HIGH }
-enum class TaskCompletionType { NOT_COMPLETED, EARLY, ON_TIME, LATE }
-enum class SyncStatus { SYNCED, CREATED, UPDATED, DELETED }
 
 @Entity(
     tableName = Task.TABLE_NAME,
@@ -25,7 +21,11 @@ enum class SyncStatus { SYNCED, CREATED, UPDATED, DELETED }
             childColumns = [Task.PARENT_ID_COLUMN],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    indices = [
+        Index(value = ["start_at"]),
+        Index(value = ["due_at"])
+    ],
 )
 data class Task(
     @PrimaryKey(autoGenerate = true)
@@ -71,9 +71,6 @@ data class Task(
     @ColumnInfo(name = GOOGLE_TASK_ID_COLUMN)
     val googleTaskId: String? = null,
 
-    @ColumnInfo(name = COMPLETION_TYPE_COLUMN)
-    val completionType: TaskCompletionType = TaskCompletionType.NOT_COMPLETED,
-
     @ColumnInfo(name = RRULE_COLUMN)
     val rrule: String? = null
 ) {
@@ -93,7 +90,6 @@ data class Task(
         const val UPDATED_AT_COLUMN = "updated_at"
         const val SYNC_STATUS_COLUMN = "sync_status"
         const val GOOGLE_TASK_ID_COLUMN = "google_task_id"
-        const val COMPLETION_TYPE_COLUMN = "completion_type"
         const val RRULE_COLUMN = "rrule"
     }
 }

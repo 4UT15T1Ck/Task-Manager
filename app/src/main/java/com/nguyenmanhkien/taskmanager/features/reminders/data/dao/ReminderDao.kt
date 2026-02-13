@@ -2,24 +2,19 @@ package com.nguyenmanhkien.taskmanager.features.reminders.data.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Update
+import androidx.room.Upsert
 import com.nguyenmanhkien.taskmanager.features.reminders.domain.model.Reminder
 import com.nguyenmanhkien.taskmanager.features.reminders.domain.model.ReminderStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ReminderDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertReminders(reminders: List<Reminder>)
+    @Upsert
+    suspend fun upsertReminders(reminders: List<Reminder>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertReminder(reminder: Reminder)
-
-    @Update
-    suspend fun updateReminder(reminder: Reminder)
+    @Upsert
+    suspend fun upsertReminder(reminder: Reminder)
 
     @Delete
     suspend fun deleteReminder(reminder: Reminder)
