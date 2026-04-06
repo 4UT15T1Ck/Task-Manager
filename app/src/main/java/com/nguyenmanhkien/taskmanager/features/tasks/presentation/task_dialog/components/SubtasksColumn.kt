@@ -45,7 +45,7 @@ fun SubtasksColumn(
                 listState.animateScrollToItem(lastIndex)
             }
             // Small delay to ensure scrolling completes before focusing
-            delay(100)
+            delay(5)
             focusRequesters.lastOrNull()?.requestFocus()
         }
     }

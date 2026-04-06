@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.Flow
 interface TaskDao {
 
     @Upsert
-    suspend fun upsertTask(task: Task)
+    suspend fun upsertTask(task: Task): Long
 
     @Upsert
     suspend fun upsertTasks(tasks: List<Task>)
@@ -37,6 +37,7 @@ interface TaskDao {
     @Query(
         "SELECT * FROM ${Task.TABLE_NAME}" +
                 " WHERE ${Task.PARENT_ID_COLUMN} = :taskId " +
+                "AND ${Task.SYNC_STATUS_COLUMN} != 'DELETED' " +
                 "ORDER BY ${Task.CREATED_AT_COLUMN} ASC"
     )
     suspend fun getSubtasksForTaskOnce(taskId: Int): List<Task>
@@ -45,6 +46,7 @@ interface TaskDao {
     @Query(
         "SELECT * FROM ${Task.TABLE_NAME}" +
                 " WHERE ${Task.PARENT_ID_COLUMN} = :taskId " +
+                "AND ${Task.SYNC_STATUS_COLUMN} != 'DELETED' " +
                 "ORDER BY ${Task.CREATED_AT_COLUMN} ASC"
     )
     fun getSubtasksForTaskFlow(taskId: Int): Flow<List<Task>>
@@ -138,6 +140,34 @@ interface TaskDao {
 
     @Query(
         "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.STATUS_COLUMN} = :status" +
+                " WHERE ${Task.ID_COLUMN} IN (:ids)"
+    )
+    suspend fun setTasksStatus(ids: List<Int>, status: TaskStatus)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.STATUS_COLUMN} = :status, ${Task.COMPLETION_DATE_COLUMN} = :completionDate" +
+                " WHERE ${Task.ID_COLUMN} = :id"
+    )
+    suspend fun setTaskStatusWithCompletionDate(id: Int, status: TaskStatus, completionDate: Long?)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.STATUS_COLUMN} = :status, ${Task.COMPLETION_DATE_COLUMN} = :completionDate" +
+                " WHERE ${Task.ID_COLUMN} IN (:ids)"
+    )
+    suspend fun setTasksStatusWithCompletionDate(ids: List<Int>, status: TaskStatus, completionDate: Long?)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.STATUS_COLUMN} = :status, ${Task.COMPLETION_DATE_COLUMN} = :completionDate" +
+                " WHERE ${Task.PARENT_ID_COLUMN} = :parentId"
+    )
+    suspend fun setSubtasksStatusWithCompletionDateByParentId(parentId: Int, status: TaskStatus, completionDate: Long?)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
                 " SET ${Task.PRIORITY_COLUMN} = :priority" +
                 " WHERE ${Task.ID_COLUMN} = :id"
     )
@@ -149,4 +179,47 @@ interface TaskDao {
                 " WHERE ${Task.ID_COLUMN} = :id"
     )
     suspend fun setTaskSyncStatus(id: Int, syncStatus: SyncStatus)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.SYNC_STATUS_COLUMN} = :syncStatus" +
+                " WHERE ${Task.ID_COLUMN} IN (:ids)"
+    )
+    suspend fun setTasksSyncStatus(ids: List<Int>, syncStatus: SyncStatus)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.SYNC_STATUS_COLUMN} = :syncStatus" +
+                " WHERE ${Task.PARENT_ID_COLUMN} IN (:parentIds)"
+    )
+    suspend fun setSubtasksSyncStatusByParentIds(parentIds: List<Int>, syncStatus: SyncStatus)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.CATEGORY_ID_COLUMN} = :categoryId" +
+                " WHERE ${Task.ID_COLUMN} = :id"
+    )
+    suspend fun setTaskCategory(id: Int, categoryId: Int?)
+
+    @Query(
+        "UPDATE ${Task.TABLE_NAME}" +
+                " SET ${Task.CATEGORY_ID_COLUMN} = :categoryId" +
+                " WHERE ${Task.ID_COLUMN} IN (:ids)"
+    )
+    suspend fun setTasksCategory(ids: List<Int>, categoryId: Int?)
+
+    @Transaction
+    suspend fun setTasksAndSubtasksSyncStatus(parentIds: List<Int>, syncStatus: SyncStatus) {
+        if (parentIds.isEmpty()) {
+            return
+        }
+        setTasksSyncStatus(parentIds, syncStatus)
+        setSubtasksSyncStatusByParentIds(parentIds, syncStatus)
+    }
+
+    @Transaction
+    suspend fun setTaskAndSubtasksStatusWithCompletionDate(parentId: Int, status: TaskStatus, completionDate: Long?) {
+        setTaskStatusWithCompletionDate(parentId, status, completionDate)
+        setSubtasksStatusWithCompletionDateByParentId(parentId, status, completionDate)
+    }
 }

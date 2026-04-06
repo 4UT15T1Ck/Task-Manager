@@ -12,6 +12,7 @@ class ToggleTaskCompletion(private val repository: TaskRepository) {
             TaskStatus.IN_PROGRESS -> TaskStatus.COMPLETED
             TaskStatus.COMPLETED -> TaskStatus.IN_PROGRESS
         }
-        repository.updateStatus(task.id, newStatus)
+        val completionDate = if (newStatus == TaskStatus.COMPLETED) System.currentTimeMillis() else null
+        repository.updateStatusWithCompletionDate(task.id, newStatus, completionDate)
     }
 }

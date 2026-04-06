@@ -38,13 +38,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_calendar.TaskCalendarScreen
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_dialog.AddTaskDialog
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_detail.TaskDetailScreen
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.TaskListScreen
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.TaskListViewModel
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.TaskSelectionScreen
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_statistics.TaskStatisticsScreen
 import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val taskListViewModel: TaskListViewModel = koinViewModel()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -132,11 +137,28 @@ fun AppNavigation() {
             ) {
                 composable(route = Screen.TaskListScreen.route) {
                     TaskListScreen(
+                        viewModel = taskListViewModel,
                         onTaskClick = { taskId ->
                             navController.navigate(
                                 Screen.TaskDetailScreen.route + "?taskId=$taskId"
                             )
                         },
+                        onCategorySelected = { categoryId ->
+                            selectedCategoryId = categoryId
+                        },
+                        onManageCategories = {
+                            navController.navigate(Screen.CategoryManagementScreen.route)
+                        },
+                        onEnterSelectionMode = {
+                            navController.navigate(Screen.TaskSelectionScreen.route)
+                        }
+                    )
+                }
+
+                composable(route = Screen.TaskSelectionScreen.route) {
+                    TaskSelectionScreen(
+                        viewModel = taskListViewModel,
+                        onNavigateBack = { navController.popBackStack() },
                         onCategorySelected = { categoryId ->
                             selectedCategoryId = categoryId
                         }
@@ -174,7 +196,12 @@ fun AppNavigation() {
                     val taskId = backStackEntry.arguments?.getInt("taskId") ?: -1
                     TaskDetailScreen(
                         taskId = taskId,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToTaskDetail = { duplicatedTaskId ->
+                            navController.navigate(Screen.TaskDetailScreen.route + "?taskId=$duplicatedTaskId") {
+                                launchSingleTop = true
+                            }
+                        }
                     )
                 }
 
@@ -214,24 +241,9 @@ fun AppNavigation() {
     }
 }
 
-// Temporary placeholder screens
-@Composable
-fun TaskDetailScreen(
-    taskId: Int,
-    onNavigateBack: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            if (taskId == -1) "Add Task Screen"
-            else "Task Detail/Edit Screen - Task ID: $taskId"
-        )
-    }
-}
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun SettingsScreen(
     onNavigateBack: () -> Unit
 ) {
@@ -244,6 +256,7 @@ fun SettingsScreen(
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun AccountScreen(
     onNavigateBack: () -> Unit
 ) {
@@ -256,6 +269,7 @@ fun AccountScreen(
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun CategoryManagementScreen(
     onNavigateBack: () -> Unit
 ) {

@@ -5,12 +5,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Category
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.OrderType
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskOrderField
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskStatus
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskWithSubtasks
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TimeFilter
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.use_case.TaskUseCases
-import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.OrderType
-import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskOrderField
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
@@ -22,6 +24,11 @@ import org.koin.android.annotation.KoinViewModel
 class TaskListViewModel(
     private val taskUseCases: TaskUseCases
 ) : ViewModel() {
+    companion object {
+        private const val SEARCH_DEBOUNCE_MS = 100L
+        private const val PARENT_COMPLETION_ANIMATION_MS = 500L
+    }
+
     private val _state = mutableStateOf(TaskListState())
     val state: State<TaskListState> = _state
     private var getTasksJob: Job? = null
@@ -39,22 +46,35 @@ class TaskListViewModel(
             is TaskListEvent.SortTask -> sortTask(event.taskOrderField, event.orderType)
             is TaskListEvent.FilterByCategory -> filterByCategory(event.category)
             is TaskListEvent.SearchTask -> searchTask(event.searchString)
-            is TaskListEvent.ToggleTaskCompletion -> toggleTaskCompletion(event.task)
+            is TaskListEvent.ShowSearchBar -> showSearchBar()
+            is TaskListEvent.HideSearchBar -> hideSearchBar()
+            is TaskListEvent.ToggleParentTaskCompletion -> toggleParentTaskCompletion(event.task)
+            is TaskListEvent.ToggleSubtaskCompletion -> toggleSubtaskCompletion(event.task)
             is TaskListEvent.SetTaskPriority -> setTaskPriority(event.taskId, event.priority)
+            is TaskListEvent.OpenPriorityMenu -> openPriorityMenu(event.taskId)
+            is TaskListEvent.DismissPriorityMenu -> dismissPriorityMenu()
+            is TaskListEvent.ToggleHeaderMenu -> toggleHeaderMenu()
+            is TaskListEvent.DismissHeaderMenu -> dismissHeaderMenu()
+            is TaskListEvent.ToggleShowSubtasks -> toggleShowSubtasks()
+            is TaskListEvent.EnterSelectionMode -> enterSelectionMode()
+            is TaskListEvent.ExitSelectionMode -> exitSelectionMode()
+            is TaskListEvent.ToggleTaskSelection -> toggleTaskSelection(event.taskId)
+            is TaskListEvent.ToggleSectionSelection -> toggleSectionSelection(event.taskIds)
+            is TaskListEvent.CompleteSelectedTasks -> completeSelectedTasks()
+            is TaskListEvent.DeleteSelectedTasks -> deleteSelectedTasks()
+            is TaskListEvent.ChangeSelectedTasksCategory -> changeSelectedTasksCategory(event.categoryId)
+            is TaskListEvent.ShowBulkCategoryMenu -> showBulkCategoryMenu()
+            is TaskListEvent.DismissBulkCategoryMenu -> dismissBulkCategoryMenu()
             is TaskListEvent.ToggleCompletedTasksVisibility -> toggleCompletedTasksVisibility()
             is TaskListEvent.TogglePendingTasksVisibility -> togglePendingTasksVisibility()
         }
     }
 
     private fun filterTaskByTime(timeFilter: TimeFilter) {
-        if (state.value.timeFilter == timeFilter) {
-            _state.value = state.value.copy(
-                timeFilter = TimeFilter.NONE
-            )
+        _state.value = if (state.value.timeFilter == timeFilter) {
+            state.value.copy(timeFilter = TimeFilter.NONE)
         } else {
-            _state.value = state.value.copy(
-                timeFilter = timeFilter
-            )
+            state.value.copy(timeFilter = timeFilter)
         }
         getTasks()
     }
@@ -71,9 +91,8 @@ class TaskListViewModel(
             orderType = orderType
         )
 
-        val sortedTasks = applySorting(state.value.tasks)
         _state.value = state.value.copy(
-            tasks = sortedTasks
+            taskItems = applySorting(state.value.taskItems)
         )
     }
 
@@ -90,14 +109,56 @@ class TaskListViewModel(
     private fun searchTask(searchString: String) {
         searchJob?.cancel()
 
+        _state.value = state.value.copy(
+            searchString = searchString,
+            isSearchVisible = state.value.isSearchVisible || searchString.isNotBlank()
+        )
+
         searchJob = viewModelScope.launch {
-            delay(200)
-            _state.value = state.value.copy(searchString = searchString)
+            delay(SEARCH_DEBOUNCE_MS)
             getTasks()
         }
     }
 
-    private fun toggleTaskCompletion(task: Task) {
+    private fun showSearchBar() {
+        if (state.value.isSearchVisible) {
+            return
+        }
+        _state.value = state.value.copy(isSearchVisible = true)
+    }
+
+    private fun hideSearchBar() {
+        if (!state.value.isSearchVisible || state.value.searchString.isNotBlank()) {
+            return
+        }
+        _state.value = state.value.copy(isSearchVisible = false)
+    }
+
+    private fun toggleParentTaskCompletion(task: Task) {
+        if (task.status == TaskStatus.COMPLETED) {
+            viewModelScope.launch {
+                taskUseCases.taskCRUD.setTaskAndSubtasksStatus(task.id, TaskStatus.IN_PROGRESS)
+            }
+            return
+        }
+
+        if (task.id in state.value.animatingTaskIds) {
+            return
+        }
+
+        _state.value = state.value.copy(
+            animatingTaskIds = state.value.animatingTaskIds + task.id
+        )
+        viewModelScope.launch {
+            delay(PARENT_COMPLETION_ANIMATION_MS)
+            taskUseCases.taskCRUD.setTaskAndSubtasksStatus(task.id, TaskStatus.COMPLETED)
+            _state.value = state.value.copy(
+                animatingTaskIds = state.value.animatingTaskIds - task.id
+            )
+        }
+    }
+
+    private fun toggleSubtaskCompletion(task: Task) {
         viewModelScope.launch {
             taskUseCases.taskCRUD.toggleTaskCompletion(task)
         }
@@ -107,6 +168,118 @@ class TaskListViewModel(
         viewModelScope.launch {
             taskUseCases.taskCRUD.setPriority(taskId, priority)
         }
+        dismissPriorityMenu()
+    }
+
+    private fun openPriorityMenu(taskId: Int) {
+        _state.value = state.value.copy(activePriorityTaskId = taskId)
+    }
+
+    private fun dismissPriorityMenu() {
+        _state.value = state.value.copy(activePriorityTaskId = null)
+    }
+
+    private fun toggleHeaderMenu() {
+        _state.value = state.value.copy(
+            isHeaderMenuExpanded = !state.value.isHeaderMenuExpanded
+        )
+    }
+
+    private fun dismissHeaderMenu() {
+        _state.value = state.value.copy(isHeaderMenuExpanded = false)
+    }
+
+    private fun toggleShowSubtasks() {
+        _state.value = state.value.copy(
+            isShowingSubtasks = !state.value.isShowingSubtasks,
+            isHeaderMenuExpanded = false
+        )
+    }
+
+    private fun enterSelectionMode() {
+        _state.value = state.value.copy(
+            isSelectionMode = true,
+            selectedTaskIds = emptySet(),
+            isHeaderMenuExpanded = false
+        )
+    }
+
+    private fun exitSelectionMode() {
+        _state.value = state.value.copy(
+            isSelectionMode = false,
+            selectedTaskIds = emptySet(),
+            isBulkCategoryMenuExpanded = false
+        )
+    }
+
+    private fun toggleTaskSelection(taskId: Int) {
+        val selectedTaskIds = state.value.selectedTaskIds.toMutableSet()
+        if (!selectedTaskIds.add(taskId)) {
+            selectedTaskIds.remove(taskId)
+        }
+        _state.value = state.value.copy(selectedTaskIds = selectedTaskIds)
+    }
+
+    private fun toggleSectionSelection(taskIds: List<Int>) {
+        if (taskIds.isEmpty()) {
+            return
+        }
+
+        val selectedTaskIds = state.value.selectedTaskIds.toMutableSet()
+        val areAllSelected = taskIds.all { it in selectedTaskIds }
+        if (areAllSelected) {
+            selectedTaskIds.removeAll(taskIds.toSet())
+        } else {
+            selectedTaskIds.addAll(taskIds)
+        }
+        _state.value = state.value.copy(selectedTaskIds = selectedTaskIds)
+    }
+
+    private fun completeSelectedTasks() {
+        val selectedIds = state.value.selectedTaskIds.toList()
+        if (selectedIds.isEmpty()) {
+            return
+        }
+        val selectedInProgressIds = state.value.taskItems
+            .asSequence()
+            .filter { it.task.id in selectedIds }
+            .filter { it.task.status != TaskStatus.COMPLETED }
+            .map { it.task.id }
+            .toList()
+        viewModelScope.launch {
+            taskUseCases.taskCRUD.setStatus(selectedInProgressIds, TaskStatus.COMPLETED)
+            exitSelectionMode()
+        }
+    }
+
+    private fun deleteSelectedTasks() {
+        val selectedIds = state.value.selectedTaskIds.toList()
+        if (selectedIds.isEmpty()) {
+            return
+        }
+        viewModelScope.launch {
+            taskUseCases.taskCRUD.bulkDeleteTasks(selectedIds)
+            exitSelectionMode()
+        }
+    }
+
+    private fun changeSelectedTasksCategory(categoryId: Int?) {
+        val selectedIds = state.value.selectedTaskIds.toList()
+        if (selectedIds.isEmpty()) {
+            return
+        }
+        viewModelScope.launch {
+            taskUseCases.taskCRUD.setCategory(selectedIds, categoryId)
+            exitSelectionMode()
+        }
+    }
+
+    private fun showBulkCategoryMenu() {
+        _state.value = state.value.copy(isBulkCategoryMenuExpanded = true)
+    }
+
+    private fun dismissBulkCategoryMenu() {
+        _state.value = state.value.copy(isBulkCategoryMenuExpanded = false)
     }
 
     private fun togglePendingTasksVisibility() {
@@ -169,53 +342,50 @@ class TaskListViewModel(
                 Pair(null, endCal.timeInMillis)
             }
 
-            TimeFilter.NONE -> {
-                Pair(null, null)
-            }
+            TimeFilter.NONE -> Pair(null, null)
         }
 
-        getTasksJob = taskUseCases.taskCRUD.getFilteredTasks(
+        getTasksJob = taskUseCases.taskCRUD.getFilteredTasksWithSubtasks(
             categoryId = categoryId,
             startTime = startTime,
             endTime = endTime,
             searchQuery = state.value.searchString.takeIf { it.isNotBlank() }
         )
-            .onEach { tasks ->
-                val sortedTasks = applySorting(tasks)
+            .onEach { taskItems ->
                 _state.value = state.value.copy(
-                    tasks = sortedTasks
+                    taskItems = applySorting(taskItems)
                 )
             }
             .launchIn(viewModelScope)
     }
 
-    private fun applySorting(tasks: List<Task>): List<Task> {
+    private fun applySorting(tasks: List<TaskWithSubtasks>): List<TaskWithSubtasks> {
         return when (state.value.taskOrderField) {
             TaskOrderField.DUE_DATE -> {
                 when (state.value.orderType) {
-                    OrderType.ASCENDING -> tasks.sortedBy { it.dueAt }
-                    OrderType.DESCENDING -> tasks.sortedByDescending { it.dueAt }
+                    OrderType.ASCENDING -> tasks.sortedBy { it.task.dueAt }
+                    OrderType.DESCENDING -> tasks.sortedByDescending { it.task.dueAt }
                 }
             }
 
             TaskOrderField.CREATION_TIME -> {
                 when (state.value.orderType) {
-                    OrderType.ASCENDING -> tasks.sortedBy { it.createdAt }
-                    OrderType.DESCENDING -> tasks.sortedByDescending { it.createdAt }
+                    OrderType.ASCENDING -> tasks.sortedBy { it.task.createdAt }
+                    OrderType.DESCENDING -> tasks.sortedByDescending { it.task.createdAt }
                 }
             }
 
             TaskOrderField.ALPHABET -> {
                 when (state.value.orderType) {
-                    OrderType.ASCENDING -> tasks.sortedBy { it.title.lowercase() }
-                    OrderType.DESCENDING -> tasks.sortedByDescending { it.title.lowercase() }
+                    OrderType.ASCENDING -> tasks.sortedBy { it.task.title.lowercase() }
+                    OrderType.DESCENDING -> tasks.sortedByDescending { it.task.title.lowercase() }
                 }
             }
 
             TaskOrderField.PRIORITY -> {
                 when (state.value.orderType) {
-                    OrderType.ASCENDING -> tasks.sortedBy { it.priority.ordinal }
-                    OrderType.DESCENDING -> tasks.sortedByDescending { it.priority.ordinal }
+                    OrderType.ASCENDING -> tasks.sortedBy { it.task.priority.ordinal }
+                    OrderType.DESCENDING -> tasks.sortedByDescending { it.task.priority.ordinal }
                 }
             }
         }

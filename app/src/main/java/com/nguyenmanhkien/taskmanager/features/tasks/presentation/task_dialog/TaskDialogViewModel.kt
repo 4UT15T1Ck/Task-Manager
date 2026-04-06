@@ -10,11 +10,16 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.koin.android.annotation.KoinViewModel
+import java.util.Calendar
 
 @KoinViewModel
 class TaskDialogViewModel(
     private val taskUseCases: TaskUseCases,
 ) : ViewModel() {
+
+    companion object {
+        private const val MAX_SUBTASKS = 20
+    }
 
     private val _dialogState = mutableStateOf(TaskDialogState())
     val dialogState: State<TaskDialogState> = _dialogState
@@ -26,19 +31,17 @@ class TaskDialogViewModel(
         getCategories()
     }
 
-    fun setInitialCategoryId(categoryId: Int?) {
-        _dialogState.value = dialogState.value.copy(categoryId = categoryId)
-    }
-
     fun onEvent(event: TaskDialogEvent) {
         when (event) {
+            is TaskDialogEvent.SetInitialCategoryId -> handleSetInitialCategoryId(event)
             is TaskDialogEvent.EnterTitle -> handleEnterTitle(event)
             is TaskDialogEvent.ChangeTitleFocus -> handleChangeTitleFocus(event)
             is TaskDialogEvent.SelectPriority -> handleSelectPriority(event)
             is TaskDialogEvent.SelectCategory -> handleSelectCategory(event)
             is TaskDialogEvent.ToggleCategoryPicker -> handleToggleCategoryPicker()
-            is TaskDialogEvent.SelectStartDate -> handleSelectStartDate(event)
-            is TaskDialogEvent.SelectDueDate -> handleSelectDueDate(event)
+            is TaskDialogEvent.SelectDateAtStartOfDay -> handleSelectDateAtStartOfDay(event)
+            is TaskDialogEvent.SelectTimeOffset -> handleSelectTimeOffset(event)
+            is TaskDialogEvent.SelectDuration -> handleSelectDuration(event)
             is TaskDialogEvent.SetRecurrence -> handleSetRecurrence(event)
             is TaskDialogEvent.AddSubtask -> handleAddSubtask()
             is TaskDialogEvent.RemoveSubtask -> handleRemoveSubtask(event)
@@ -53,16 +56,23 @@ class TaskDialogViewModel(
         _dialogState.value = TaskDialogState(categories = dialogState.value.categories)
     }
 
+    private fun handleSetInitialCategoryId(event: TaskDialogEvent.SetInitialCategoryId) {
+        _dialogState.value = dialogState.value.copy(categoryId = event.categoryId)
+    }
+
     private fun handleEnterTitle(event: TaskDialogEvent.EnterTitle) {
         _dialogState.value = dialogState.value.copy(
-            title = dialogState.value.title.copy(text = event.value)
+            title = dialogState.value.title.copy(
+                text = event.value,
+                isHintVisible = event.value.isBlank()
+            )
         )
     }
 
     private fun handleChangeTitleFocus(event: TaskDialogEvent.ChangeTitleFocus) {
         _dialogState.value = dialogState.value.copy(
             title = dialogState.value.title.copy(
-                isHintVisible = !event.focusState.isFocused || dialogState.value.title.text.isBlank()
+                isHintVisible = dialogState.value.title.text.isBlank()
             )
         )
     }
@@ -85,12 +95,16 @@ class TaskDialogViewModel(
         )
     }
 
-    private fun handleSelectStartDate(event: TaskDialogEvent.SelectStartDate) {
-        _dialogState.value = dialogState.value.copy(startDate = event.timestamp)
+    private fun handleSelectDateAtStartOfDay(event: TaskDialogEvent.SelectDateAtStartOfDay) {
+        _dialogState.value = dialogState.value.copy(dateAtStartOfDay = event.timestamp)
     }
 
-    private fun handleSelectDueDate(event: TaskDialogEvent.SelectDueDate) {
-        _dialogState.value = dialogState.value.copy(dueDate = event.timestamp)
+    private fun handleSelectTimeOffset(event: TaskDialogEvent.SelectTimeOffset) {
+        _dialogState.value = dialogState.value.copy(timeOffsetMillis = event.offsetMillis)
+    }
+
+    private fun handleSelectDuration(event: TaskDialogEvent.SelectDuration) {
+        _dialogState.value = dialogState.value.copy(durationMillis = event.durationMillis)
     }
 
     private fun handleSetRecurrence(event: TaskDialogEvent.SetRecurrence) {
@@ -98,7 +112,7 @@ class TaskDialogViewModel(
     }
 
     private fun handleAddSubtask() {
-        if (dialogState.value.subtasks.size >= 20) {
+        if (dialogState.value.subtasks.size >= MAX_SUBTASKS) {
             viewModelScope.launch {
                 _eventFlow.emit(UiEvent.ShowSnackBar("Too many subtasks! Add a continued task for better management instead."))
             }
@@ -121,7 +135,10 @@ class TaskDialogViewModel(
         _dialogState.value = dialogState.value.copy(
             subtasks = dialogState.value.subtasks.mapIndexed { index, subtask ->
                 if (index == event.index) {
-                    subtask.copy(text = event.text)
+                    subtask.copy(
+                        text = event.text,
+                        isHintVisible = event.text.isBlank()
+                    )
                 } else subtask
             }
         )
@@ -132,7 +149,7 @@ class TaskDialogViewModel(
             subtasks = dialogState.value.subtasks.mapIndexed { index, subtask ->
                 if (index == event.index) {
                     subtask.copy(
-                        isHintVisible = !event.focusState.isFocused || subtask.text.isBlank()
+                        isHintVisible = subtask.text.isBlank()
                     )
                 } else subtask
             }
@@ -154,22 +171,19 @@ class TaskDialogViewModel(
             }
 
             try {
-                // If dueDate is null, set it to 23:59:59 today
                 val currentTime = System.currentTimeMillis()
-                val finalDueDate = dialogState.value.dueDate ?: run {
-                    val calendar = java.util.Calendar.getInstance()
-                    calendar.timeInMillis = currentTime
-                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 23)
-                    calendar.set(java.util.Calendar.MINUTE, 59)
-                    calendar.set(java.util.Calendar.SECOND, 59)
-                    calendar.set(java.util.Calendar.MILLISECOND, 999)
-                    calendar.timeInMillis
-                }
+                val selectedDate = dialogState.value.dateAtStartOfDay ?: startOfDay(currentTime)
+                val selectedTimeOffset =
+                    dialogState.value.timeOffsetMillis ?: timeOffsetMillis(currentTime)
+                val finalStartAt = selectedDate + selectedTimeOffset
+                val finalDueDate = dialogState.value.durationMillis?.let { duration ->
+                    finalStartAt + duration
+                } ?: finalStartAt
 
                 val task = Task(
                     title = dialogState.value.title.text,
                     description = null,
-                    startAt = dialogState.value.startDate ?: currentTime,
+                    startAt = finalStartAt,
                     dueAt = finalDueDate,
                     categoryId = dialogState.value.categoryId,
                     priority = dialogState.value.priority,
@@ -178,7 +192,23 @@ class TaskDialogViewModel(
                     updatedAt = currentTime
                 )
 
-                taskUseCases.taskCRUD.upsertTask(task)
+                val parentTaskId = taskUseCases.taskCRUD.upsertTask(task).toInt()
+
+                val subtaskTitles = dialogState.value.subtasks
+                    .map { it.text.trim() }
+                    .filter { it.isNotEmpty() }
+
+                subtaskTitles.forEach { subtaskTitle ->
+                    taskUseCases.taskCRUD.upsertTask(
+                        Task(
+                            title = subtaskTitle,
+                            parentId = parentTaskId,
+                            categoryId = task.categoryId,
+                            createdAt = currentTime,
+                            updatedAt = currentTime
+                        )
+                    )
+                }
 
                 // Clear state after saving
                 clearState()
@@ -196,6 +226,23 @@ class TaskDialogViewModel(
                 _dialogState.value = dialogState.value.copy(categories = categories)
             }
         }
+    }
+
+    private fun startOfDay(timestamp: Long): Long {
+        return Calendar.getInstance().apply {
+            timeInMillis = timestamp
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    private fun timeOffsetMillis(timestamp: Long): Long {
+        val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
+        val hours = calendar.get(Calendar.HOUR_OF_DAY)
+        val minutes = calendar.get(Calendar.MINUTE)
+        return ((hours * 60) + minutes) * 60_000L
     }
 
     sealed class UiEvent {

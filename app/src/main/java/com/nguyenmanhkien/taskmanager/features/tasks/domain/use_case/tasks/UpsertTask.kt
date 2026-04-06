@@ -10,13 +10,13 @@ import kotlin.jvm.Throws
 @Factory
 class UpsertTask(private val repository: TaskRepository) {
     @Throws(InvalidTaskException::class)
-    suspend operator fun invoke(task: Task) {
+    suspend operator fun invoke(task: Task): Long {
         if (task.title.isEmpty())
             throw InvalidTaskException("The title of the task can't be empty.")
         val taskToSave = task.copy(
             updatedAt = System.currentTimeMillis(),
             syncStatus = if (task.id == 0) SyncStatus.CREATED else SyncStatus.UPDATED
         )
-        repository.upsertTask(taskToSave)
+        return repository.upsertTask(taskToSave)
     }
 }

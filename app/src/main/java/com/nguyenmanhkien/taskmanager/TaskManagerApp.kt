@@ -3,6 +3,7 @@ package com.nguyenmanhkien.taskmanager
 import android.app.Application
 import com.nguyenmanhkien.taskmanager.core.di.CoreFactoryModule
 import com.nguyenmanhkien.taskmanager.features.account.di.AccountFactoryModule
+import com.nguyenmanhkien.taskmanager.features.reminders.di.ReminderFactoryModule
 import com.nguyenmanhkien.taskmanager.features.tasks.data.local.seed.DatabaseInitializer
 import com.nguyenmanhkien.taskmanager.features.tasks.di.TasksFactoryModule
 import org.koin.android.ext.android.inject
@@ -20,6 +21,7 @@ class TaskManagerApp : Application() {
             modules(
                 CoreFactoryModule().module,
                 AccountFactoryModule().module,
+                ReminderFactoryModule().module,
                 TasksFactoryModule().module
             )
         }

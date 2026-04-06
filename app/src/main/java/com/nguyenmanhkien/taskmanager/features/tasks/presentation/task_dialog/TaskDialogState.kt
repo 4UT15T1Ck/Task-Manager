@@ -9,8 +9,9 @@ data class TaskDialogState(
     val categories: List<Category> = emptyList(),
     val categoryId: Int? = null,
     val showCategoryPicker: Boolean = false,
-    val startDate: Long? = null,
-    val dueDate: Long? = null,
+    val dateAtStartOfDay: Long? = null,
+    val timeOffsetMillis: Long? = null,
+    val durationMillis: Long? = null,
     val priority: TaskPriority = TaskPriority.NO_PRIORITY,
     val rrule: String? = null,
 )

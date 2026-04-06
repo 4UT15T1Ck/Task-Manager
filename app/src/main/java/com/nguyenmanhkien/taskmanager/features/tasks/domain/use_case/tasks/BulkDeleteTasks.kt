@@ -1,13 +1,15 @@
 package com.nguyenmanhkien.taskmanager.features.tasks.domain.use_case.tasks
 
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.SyncStatus
-import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.repository.TaskRepository
 import org.koin.core.annotation.Factory
 
 @Factory
-class DeleteTask(private val repository: TaskRepository) {
-    suspend operator fun invoke(task: Task) {
-        repository.updateTasksAndSubtasksSyncStatus(listOf(task.id), SyncStatus.DELETED)
+class BulkDeleteTasks(private val repository: TaskRepository) {
+    suspend operator fun invoke(taskIds: List<Int>) {
+        if (taskIds.isEmpty()) {
+            return
+        }
+        repository.updateTasksAndSubtasksSyncStatus(taskIds, SyncStatus.DELETED)
     }
 }

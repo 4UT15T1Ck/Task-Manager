@@ -10,11 +10,13 @@ sealed class TaskDialogEvent {
 
 
     // Task property events
+    data class SetInitialCategoryId(val categoryId: Int?) : TaskDialogEvent()
     data class SelectPriority(val priority: TaskPriority) : TaskDialogEvent()
     data class SelectCategory(val categoryId: Int?) : TaskDialogEvent()
     data object ToggleCategoryPicker : TaskDialogEvent()
-    data class SelectStartDate(val timestamp: Long?) : TaskDialogEvent()
-    data class SelectDueDate(val timestamp: Long?) : TaskDialogEvent()
+    data class SelectDateAtStartOfDay(val timestamp: Long?) : TaskDialogEvent()
+    data class SelectTimeOffset(val offsetMillis: Long?) : TaskDialogEvent()
+    data class SelectDuration(val durationMillis: Long?) : TaskDialogEvent()
     data class SetRecurrence(val rrule: String?) : TaskDialogEvent()
 
     // Subtask events

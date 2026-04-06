@@ -53,7 +53,7 @@ class TaskRepositoryImpl(
     override suspend fun getOverdueInProgressIds(currentTime: Long): List<Int> =
         dao.getOverdueInProgressTasks(currentTime)
 
-    override suspend fun upsertTask(task: Task) = dao.upsertTask(task)
+    override suspend fun upsertTask(task: Task): Long = dao.upsertTask(task)
 
     override suspend fun upsertTasks(tasks: List<Task>) = dao.upsertTasks(tasks)
 
@@ -63,8 +63,50 @@ class TaskRepositoryImpl(
 
     override suspend fun updateStatus(id: Int, status: TaskStatus) = dao.setTaskStatus(id, status)
 
+    override suspend fun updateStatuses(ids: List<Int>, status: TaskStatus) {
+        if (ids.isEmpty()) {
+            return
+        }
+        dao.setTasksStatus(ids, status)
+    }
+
+    override suspend fun updateStatusWithCompletionDate(id: Int, status: TaskStatus, completionDate: Long?) {
+        dao.setTaskStatusWithCompletionDate(id, status, completionDate)
+    }
+
+    override suspend fun updateStatusesWithCompletionDate(ids: List<Int>, status: TaskStatus, completionDate: Long?) {
+        if (ids.isEmpty()) {
+            return
+        }
+        dao.setTasksStatusWithCompletionDate(ids, status, completionDate)
+    }
+
+    override suspend fun updateTaskAndSubtasksStatus(parentId: Int, status: TaskStatus, completionDate: Long?) {
+        dao.setTaskAndSubtasksStatusWithCompletionDate(parentId, status, completionDate)
+    }
+
     override suspend fun updatePriority(id: Int, priority: TaskPriority) = dao.setTaskPriority(id, priority)
+
+    override suspend fun updateCategory(id: Int, categoryId: Int?) = dao.setTaskCategory(id, categoryId)
+
+    override suspend fun updateCategories(ids: List<Int>, categoryId: Int?) {
+        if (ids.isEmpty()) {
+            return
+        }
+        dao.setTasksCategory(ids, categoryId)
+    }
 
     override suspend fun updateSyncStatus(id: Int, syncStatus: SyncStatus) =
         dao.setTaskSyncStatus(id, syncStatus)
+
+    override suspend fun updateSyncStatuses(ids: List<Int>, syncStatus: SyncStatus) {
+        if (ids.isEmpty()) {
+            return
+        }
+        dao.setTasksSyncStatus(ids, syncStatus)
+    }
+
+    override suspend fun updateTasksAndSubtasksSyncStatus(parentIds: List<Int>, syncStatus: SyncStatus) {
+        dao.setTasksAndSubtasksSyncStatus(parentIds, syncStatus)
+    }
 }

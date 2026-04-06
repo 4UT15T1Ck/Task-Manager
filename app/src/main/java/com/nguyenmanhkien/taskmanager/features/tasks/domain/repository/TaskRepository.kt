@@ -34,7 +34,7 @@ interface TaskRepository {
 
     suspend fun getOverdueInProgressIds(currentTime: Long): List<Int>
 
-    suspend fun upsertTask(task: Task)
+    suspend fun upsertTask(task: Task): Long
 
     suspend fun upsertTasks(tasks: List<Task>)
 
@@ -44,7 +44,23 @@ interface TaskRepository {
 
     suspend fun updateStatus(id: Int, status: TaskStatus)
 
+    suspend fun updateStatuses(ids: List<Int>, status: TaskStatus)
+
+    suspend fun updateStatusWithCompletionDate(id: Int, status: TaskStatus, completionDate: Long?)
+
+    suspend fun updateStatusesWithCompletionDate(ids: List<Int>, status: TaskStatus, completionDate: Long?)
+
+    suspend fun updateTaskAndSubtasksStatus(parentId: Int, status: TaskStatus, completionDate: Long?)
+
     suspend fun updatePriority(id: Int, priority: TaskPriority)
 
+    suspend fun updateCategory(id: Int, categoryId: Int?)
+
+    suspend fun updateCategories(ids: List<Int>, categoryId: Int?)
+
     suspend fun updateSyncStatus(id: Int, syncStatus: SyncStatus)
+
+    suspend fun updateSyncStatuses(ids: List<Int>, syncStatus: SyncStatus)
+
+    suspend fun updateTasksAndSubtasksSyncStatus(parentIds: List<Int>, syncStatus: SyncStatus)
 }
