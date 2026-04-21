@@ -9,11 +9,13 @@ import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TimeFilter
 data class TaskListState(
     val taskItems: List<TaskWithSubtasks> = emptyList(),
     val categories: List<Category> = emptyList(),
+    val categoryTaskCounts: Map<Int, Int> = emptyMap(),
     val chosenCategory: Category? = null,
     val taskOrderField: TaskOrderField = TaskOrderField.DUE_DATE,
     val orderType: OrderType = OrderType.DESCENDING,
     val searchString: String = "",
     val timeFilter: TimeFilter = TimeFilter.TODAY,
+    val isSortDialogVisible: Boolean = false,
     val isSearchVisible: Boolean = false,
     val isHeaderMenuExpanded: Boolean = false,
     val isShowingSubtasks: Boolean = false,
@@ -21,7 +23,7 @@ data class TaskListState(
     val selectedTaskIds: Set<Int> = emptySet(),
     val animatingTaskIds: Set<Int> = emptySet(),
     val activePriorityTaskId: Int? = null,
-    val isBulkCategoryMenuExpanded: Boolean = false,
+    val isCategoryMenuExpanded: Boolean = false,
     val isPendingTasksVisible: Boolean = true,
     val isCompletedTasksVisible: Boolean = true
 )

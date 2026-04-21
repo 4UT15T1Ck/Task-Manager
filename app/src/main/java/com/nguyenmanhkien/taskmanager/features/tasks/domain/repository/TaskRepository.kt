@@ -1,6 +1,7 @@
 package com.nguyenmanhkien.taskmanager.features.tasks.domain.repository
 
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.SyncStatus
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.DayTaskSummary
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskStatus
@@ -8,6 +9,8 @@ import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskWithSubtas
 import kotlinx.coroutines.flow.Flow
 
 interface TaskRepository {
+    fun getParentTaskCountsByCategory(): Flow<Map<Int, Int>>
+
     fun getFilteredTasks(
         categoryId: Int? = null,
         startTime: Long? = null,
@@ -25,6 +28,10 @@ interface TaskRepository {
 
 
     fun getDaysWithTasks(startTime: Long, endTime: Long): Flow<List<Long>>
+
+    fun getParentTasksInRange(startTime: Long, endTime: Long): Flow<List<Task>>
+
+    fun getDayTaskSummariesInRange(startTime: Long, endTime: Long): Flow<List<DayTaskSummary>>
 
     suspend fun getSubtasksOnce(taskId: Int): List<Task>
 

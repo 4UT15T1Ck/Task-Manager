@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskStatus
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TimeFilter
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.CategoryChip
-import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.TaskItemCard
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.components.TaskItemCard
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.TimeFilterChip
 
 @Composable

@@ -9,6 +9,7 @@ data class TaskCRUD(
     val getTaskDetail: GetTaskDetail,
     val getFilteredTasks: GetFilteredTasks,
     val getFilteredTasksWithSubtasks: GetFilteredTasksWithSubtasks,
+    val getParentTaskCountsByCategory: GetParentTaskCountsByCategory,
     val setCategory: SetTaskCategory,
     val setStatus: SetTaskStatus,
     val setTaskAndSubtasksStatus: SetTaskAndSubtasksStatus,

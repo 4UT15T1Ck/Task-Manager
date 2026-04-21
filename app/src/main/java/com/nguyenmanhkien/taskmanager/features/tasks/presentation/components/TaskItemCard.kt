@@ -1,4 +1,4 @@
-package com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components
+package com.nguyenmanhkien.taskmanager.features.tasks.presentation.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
@@ -53,6 +54,8 @@ private const val COMPLETION_ICON_ANIMATION_MS = 500
 
 @Composable
 fun TaskItemCard(
+    modifier: Modifier = Modifier,
+    borderRadius: Dp = 15.dp,
     taskItem: TaskWithSubtasks,
     isSelectionMode: Boolean,
     isSelected: Boolean,
@@ -74,11 +77,11 @@ fun TaskItemCard(
     }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(borderRadius),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
@@ -265,7 +268,7 @@ private fun TaskMetadataRow(taskItem: TaskWithSubtasks) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Filled.CallSplit,
+                    imageVector = Icons.Filled.AccountTree,
                     contentDescription = "Subtasks",
                     tint = Color(0xFF98A2B3),
                     modifier = Modifier.size(14.dp)

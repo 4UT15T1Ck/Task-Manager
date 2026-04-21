@@ -33,10 +33,12 @@ class TaskListViewModel(
     val state: State<TaskListState> = _state
     private var getTasksJob: Job? = null
     private var getCategoriesJob: Job? = null
+    private var getCategoryCountsJob: Job? = null
     private var searchJob: Job? = null
 
     init {
         getCategories()
+        getCategoryTaskCounts()
         getTasks()
     }
 
@@ -53,6 +55,8 @@ class TaskListViewModel(
             is TaskListEvent.SetTaskPriority -> setTaskPriority(event.taskId, event.priority)
             is TaskListEvent.OpenPriorityMenu -> openPriorityMenu(event.taskId)
             is TaskListEvent.DismissPriorityMenu -> dismissPriorityMenu()
+            is TaskListEvent.ShowSortDialog -> showSortDialog()
+            is TaskListEvent.DismissSortDialog -> dismissSortDialog()
             is TaskListEvent.ToggleHeaderMenu -> toggleHeaderMenu()
             is TaskListEvent.DismissHeaderMenu -> dismissHeaderMenu()
             is TaskListEvent.ToggleShowSubtasks -> toggleShowSubtasks()
@@ -63,8 +67,10 @@ class TaskListViewModel(
             is TaskListEvent.CompleteSelectedTasks -> completeSelectedTasks()
             is TaskListEvent.DeleteSelectedTasks -> deleteSelectedTasks()
             is TaskListEvent.ChangeSelectedTasksCategory -> changeSelectedTasksCategory(event.categoryId)
-            is TaskListEvent.ShowBulkCategoryMenu -> showBulkCategoryMenu()
-            is TaskListEvent.DismissBulkCategoryMenu -> dismissBulkCategoryMenu()
+            is TaskListEvent.ShowCategoryMenu -> showBulkCategoryMenu()
+            is TaskListEvent.DismissCategoryMenu -> dismissBulkCategoryMenu()
+            is TaskListEvent.DeleteCategory -> deleteCategory(event.category)
+            is TaskListEvent.UpsertCategory -> upsertCategory(event.category)
             is TaskListEvent.ToggleCompletedTasksVisibility -> toggleCompletedTasksVisibility()
             is TaskListEvent.TogglePendingTasksVisibility -> togglePendingTasksVisibility()
         }
@@ -92,7 +98,8 @@ class TaskListViewModel(
         )
 
         _state.value = state.value.copy(
-            taskItems = applySorting(state.value.taskItems)
+            taskItems = applySorting(state.value.taskItems),
+            isSortDialogVisible = false
         )
     }
 
@@ -179,6 +186,15 @@ class TaskListViewModel(
         _state.value = state.value.copy(activePriorityTaskId = null)
     }
 
+    private fun showSortDialog() {
+        _state.value = state.value.copy(isSortDialogVisible = true)
+    }
+
+    private fun dismissSortDialog() {
+        _state.value = state.value.copy(isSortDialogVisible = false)
+    }
+
+
     private fun toggleHeaderMenu() {
         _state.value = state.value.copy(
             isHeaderMenuExpanded = !state.value.isHeaderMenuExpanded
@@ -208,7 +224,7 @@ class TaskListViewModel(
         _state.value = state.value.copy(
             isSelectionMode = false,
             selectedTaskIds = emptySet(),
-            isBulkCategoryMenuExpanded = false
+            isCategoryMenuExpanded = false
         )
     }
 
@@ -275,11 +291,23 @@ class TaskListViewModel(
     }
 
     private fun showBulkCategoryMenu() {
-        _state.value = state.value.copy(isBulkCategoryMenuExpanded = true)
+        _state.value = state.value.copy(isCategoryMenuExpanded = true)
     }
 
     private fun dismissBulkCategoryMenu() {
-        _state.value = state.value.copy(isBulkCategoryMenuExpanded = false)
+        _state.value = state.value.copy(isCategoryMenuExpanded = false)
+    }
+
+    private fun deleteCategory(category: Category) {
+        viewModelScope.launch {
+            taskUseCases.category.deleteCategory(category)
+        }
+    }
+
+    private fun upsertCategory(category: Category) {
+        viewModelScope.launch {
+            taskUseCases.category.upsertCategory(category)
+        }
     }
 
     private fun togglePendingTasksVisibility() {
@@ -401,4 +429,14 @@ class TaskListViewModel(
             }
             .launchIn(viewModelScope)
     }
+
+    private fun getCategoryTaskCounts() {
+        getCategoryCountsJob?.cancel()
+        getCategoryCountsJob = taskUseCases.taskCRUD.getParentTaskCountsByCategory()
+            .onEach { counts ->
+                _state.value = state.value.copy(categoryTaskCounts = counts)
+            }
+            .launchIn(viewModelScope)
+    }
+
 }

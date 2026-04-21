@@ -57,7 +57,27 @@ class TaskDetailViewModel(
 			}
 
 			TaskDetailEvent.ToggleTaskCompletion -> toggleTaskCompletion()
+
 			TaskDetailEvent.DuplicateTask -> duplicateTask()
+
+			TaskDetailEvent.RequestTaskDeletion -> {
+				_state.value = state.value.copy(
+					isMenuExpanded = false,
+					isDeletionRequest = true
+				)
+			}
+
+			TaskDetailEvent.CancelTaskDeletion -> {
+				_state.value = state.value.copy(isDeletionRequest = false)
+			}
+
+			TaskDetailEvent.ConfirmTaskDeletion -> {
+				val task = state.value.taskWithSubtasks?.task ?: return
+				viewModelScope.launch {
+					taskUseCases.taskCRUD.deleteTask(task)
+					_eventFlow.emit(UiEvent.NavigateBack)
+				}
+			}
 
 			TaskDetailEvent.ToggleCategoryPicker -> {
 				if (isCompleted()) return

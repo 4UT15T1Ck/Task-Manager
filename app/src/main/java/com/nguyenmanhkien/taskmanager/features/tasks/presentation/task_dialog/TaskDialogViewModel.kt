@@ -34,6 +34,7 @@ class TaskDialogViewModel(
     fun onEvent(event: TaskDialogEvent) {
         when (event) {
             is TaskDialogEvent.SetInitialCategoryId -> handleSetInitialCategoryId(event)
+            is TaskDialogEvent.SetInitialDate -> handleSetInitialDate(event)
             is TaskDialogEvent.EnterTitle -> handleEnterTitle(event)
             is TaskDialogEvent.ChangeTitleFocus -> handleChangeTitleFocus(event)
             is TaskDialogEvent.SelectPriority -> handleSelectPriority(event)
@@ -58,6 +59,16 @@ class TaskDialogViewModel(
 
     private fun handleSetInitialCategoryId(event: TaskDialogEvent.SetInitialCategoryId) {
         _dialogState.value = dialogState.value.copy(categoryId = event.categoryId)
+    }
+
+    private fun handleSetInitialDate(event: TaskDialogEvent.SetInitialDate) {
+        val timeOffset =
+            if (event.timestamp == startOfDay(System.currentTimeMillis())) null else 8 * 60 * 60_000L
+        _dialogState.value =
+            dialogState.value.copy(
+                dateAtStartOfDay = event.timestamp,
+                timeOffsetMillis = timeOffset
+            ) // Default to 8:00 AM
     }
 
     private fun handleEnterTitle(event: TaskDialogEvent.EnterTitle) {

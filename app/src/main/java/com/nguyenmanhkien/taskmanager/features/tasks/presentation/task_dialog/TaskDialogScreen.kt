@@ -63,6 +63,7 @@ import java.util.Calendar
 fun AddTaskDialog(
     onDismiss: () -> Unit,
     initialCategoryId: Int? = null,
+    initialDateAt: Long? = null,
     viewModel: TaskDialogViewModel = koinViewModel()
 ) {
     val state by viewModel.dialogState
@@ -80,6 +81,9 @@ fun AddTaskDialog(
     LaunchedEffect(Unit) {
         if (initialCategoryId != null) {
             viewModel.onEvent(TaskDialogEvent.SetInitialCategoryId(initialCategoryId))
+        }
+        if (initialDateAt != null) {
+            viewModel.onEvent(TaskDialogEvent.SetInitialDate(initialDateAt))
         }
         kotlinx.coroutines.delay(100)
         titleFocusRequester.requestFocus()
@@ -285,7 +289,7 @@ fun AddTaskDialog(
                             indication = null,
                             onClick = {}
                         ),
-                    initialDateAt = state.dateAtStartOfDay ?: startOfDay(now),
+                    initialDateAt = state.dateAtStartOfDay ?: (initialDateAt ?: startOfDay(now)),
                     initialTimeOffsetMillis = state.timeOffsetMillis ?: timeOffsetMillis(now),
                     initialDurationMillis = state.durationMillis,
                     initialRule = RecurrenceRule.fromJson(state.rrule),

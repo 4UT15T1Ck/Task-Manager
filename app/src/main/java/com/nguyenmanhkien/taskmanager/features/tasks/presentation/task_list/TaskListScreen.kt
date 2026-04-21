@@ -28,12 +28,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Alignment
@@ -57,7 +54,8 @@ import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskStatus
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TimeFilter
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.CategoryChip
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.CollapsibleSectionHeader
-import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.TaskItemCard
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.components.TaskItemCard
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.TaskSortDialog
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components.TimeFilterChip
 import org.koin.androidx.compose.koinViewModel
 
@@ -78,56 +76,47 @@ fun TaskListScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val revealThresholdPx = with(LocalDensity.current) { SearchRevealThreshold.toPx() }
     val hideThresholdPx = with(LocalDensity.current) { SearchHideThreshold.toPx() }
-    var revealAccumulator by remember { mutableFloatStateOf(0f) }
-    var hideAccumulator by remember { mutableFloatStateOf(0f) }
+    val revealAccumulator = remember { floatArrayOf(0f) }
+    val hideAccumulator = remember { floatArrayOf(0f) }
     var searchFieldBounds by remember { mutableStateOf<Rect?>(null) }
-    val isSearchVisible by rememberUpdatedState(state.isSearchVisible)
-    val searchString by rememberUpdatedState(state.searchString)
-
-    LaunchedEffect(state.isSearchVisible) {
-        if (!state.isSearchVisible) {
-            searchFieldBounds = null
-        }
-    }
-
-    fun isTaskListAtTop(): Boolean {
-        return lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
-    }
 
     val nestedScrollConnection = remember(lazyListState, revealThresholdPx, hideThresholdPx) {
         object : NestedScrollConnection {
-            @Suppress("SameReturnValue")
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source != NestedScrollSource.UserInput || !isTaskListAtTop()) {
-                    revealAccumulator = 0f
-                    hideAccumulator = 0f
+                if (source != NestedScrollSource.UserInput
+                    || !(lazyListState.firstVisibleItemIndex == 0
+                            && lazyListState.firstVisibleItemScrollOffset == 0)
+                ) {
+                    revealAccumulator[0] = 0f
+                    hideAccumulator[0] = 0f
                     return Offset.Zero
                 }
 
                 when {
-                    available.y > 0f && !isSearchVisible -> {
-                        revealAccumulator += available.y
-                        hideAccumulator = 0f
-                        if (revealAccumulator >= revealThresholdPx) {
+                    available.y > 0f && !state.isSearchVisible -> {
+                        revealAccumulator[0] += available.y
+                        hideAccumulator[0] = 0f
+                        if (revealAccumulator[0] >= revealThresholdPx) {
                             viewModel.onEvent(TaskListEvent.ShowSearchBar)
-                            revealAccumulator = 0f
+                            revealAccumulator[0] = 0f
                         }
                     }
 
-                    available.y < 0f && isSearchVisible && searchString.isBlank() -> {
-                        hideAccumulator += -available.y
-                        revealAccumulator = 0f
-                        if (hideAccumulator >= hideThresholdPx) {
+                    available.y < 0f && state.isSearchVisible && state.searchString.isBlank() -> {
+                        hideAccumulator[0] += -available.y
+                        revealAccumulator[0] = 0f
+                        if (hideAccumulator[0] >= hideThresholdPx) {
                             viewModel.onEvent(TaskListEvent.HideSearchBar)
+                            searchFieldBounds = null
                             focusManager.clearFocus(force = true)
                             keyboardController?.hide()
-                            hideAccumulator = 0f
+                            hideAccumulator[0] = 0f
                         }
                     }
 
                     else -> {
-                        revealAccumulator = 0f
-                        hideAccumulator = 0f
+                        revealAccumulator[0] = 0f
+                        hideAccumulator[0] = 0f
                     }
                 }
 
@@ -135,8 +124,8 @@ fun TaskListScreen(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                revealAccumulator = 0f
-                hideAccumulator = 0f
+                revealAccumulator[0] = 0f
+                hideAccumulator[0] = 0f
                 return Velocity.Zero
             }
         }
@@ -156,7 +145,8 @@ fun TaskListScreen(
                         val upChange = event.changes.firstOrNull { it.changedToUpIgnoreConsumed() }
                             ?: continue
 
-                        val tappedOutsideSearch = searchFieldBounds?.contains(upChange.position) != true
+                        val tappedOutsideSearch =
+                            searchFieldBounds?.contains(upChange.position) != true
                         if (tappedOutsideSearch) {
                             focusManager.clearFocus(force = true)
                             keyboardController?.hide()
@@ -242,7 +232,7 @@ fun TaskListScreen(
             Box {
                 IconButton(
                     modifier = Modifier
-                        . padding(0.dp)
+                        .padding(0.dp)
                         .size(width = 24.dp, height = 24.dp),
                     onClick = { viewModel.onEvent(TaskListEvent.ToggleHeaderMenu) }
                 ) {
@@ -257,14 +247,14 @@ fun TaskListScreen(
                     onDismissRequest = { viewModel.onEvent(TaskListEvent.DismissHeaderMenu) }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Manage category") },
+                        text = { Text("Category Menu") },
                         onClick = {
                             viewModel.onEvent(TaskListEvent.DismissHeaderMenu)
                             onManageCategories()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Select tasks") },
+                        text = { Text("Select mode") },
                         onClick = {
                             viewModel.onEvent(TaskListEvent.EnterSelectionMode)
                             viewModel.onEvent(TaskListEvent.DismissHeaderMenu)
@@ -282,6 +272,13 @@ fun TaskListScreen(
                             )
                         },
                         onClick = { viewModel.onEvent(TaskListEvent.ToggleShowSubtasks) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Sort") },
+                        onClick = {
+                            viewModel.onEvent(TaskListEvent.ShowSortDialog)
+                            viewModel.onEvent(TaskListEvent.DismissHeaderMenu)
+                        }
                     )
                 }
             }
@@ -428,6 +425,17 @@ fun TaskListScreen(
                 }
             }
         }
+        if (state.isSortDialogVisible) {
+            TaskSortDialog(
+                initialTaskOrderField = state.taskOrderField,
+                initialOrderType = state.orderType,
+                onCancel = { viewModel.onEvent(TaskListEvent.DismissSortDialog) },
+                onApply = { taskOrderField, orderType ->
+                    viewModel.onEvent(TaskListEvent.SortTask(taskOrderField, orderType))
+                }
+            )
+        }
+
     }
 }
 

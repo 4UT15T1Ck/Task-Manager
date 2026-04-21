@@ -1,101 +1,337 @@
 package com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_calendar
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
-import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.components.TaskItemCard
+import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.YearMonth
 import java.time.format.TextStyle
-import java.util.*
+import java.time.temporal.TemporalAdjusters
+import java.util.Locale
+import org.koin.androidx.compose.koinViewModel
+import java.time.ZoneId
+
+private val CalendarBorderColor = Color(0xFF6B93F2)
+private val CalendarBackground = Color(0xFFF8F9FA)
+private val TodayBackground = Color(0xFFE3F2FD)
+private val TodayText = Color(0xFF1976D2)
+private val FallbackCategoryColor = Color(0xFF6B93F2)
+private const val TOTAL_PAGER_PAGES = 2400
+private const val INITIAL_PAGER_PAGE = TOTAL_PAGER_PAGES / 2
 
 @Composable
 fun TaskCalendarScreen(
-    onTaskClick: (Int) -> Unit = {}
+    onTaskClick: (Int) -> Unit = {},
+    onDateClick: (Long?) -> Unit = {},
+    viewModel: TaskCalendarViewModel = koinViewModel()
 ) {
-    var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    val state by viewModel.state
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    val pagerState = rememberPagerState(initialPage = INITIAL_PAGER_PAGE) { TOTAL_PAGER_PAGES }
+    val accumulatedDrag = remember { floatArrayOf(0f) }
+    val isCollapsed = state.isCalendarCollapsed
+    val DRAG_THRESHOLD = 80f
 
-    // Mock data - tasks for specific dates
-    val mockTasks = remember {
-        mapOf(
-            LocalDate.of(2025, 12, 30) to listOf(
-                Task(
-                    id = 1,
-                    title = "vlm",
-                    dueAt = LocalDate.of(2025, 12, 30).toEpochDay() * 86400000,
-                    priority = TaskPriority.MEDIUM,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis(),
-                    startAt = 25200000L // 7:00 AM in milliseconds from midnight
-                )
-            ),
-            LocalDate.of(2025, 12, 31) to listOf(
-                Task(
-                    id = 2,
-                    title = "Meeting",
-                    dueAt = LocalDate.of(2025, 12, 31).toEpochDay() * 86400000,
-                    priority = TaskPriority.HIGH,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
+    val nestedScrollConnection = remember(listState, isCollapsed) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+
+                val isAtTop = listState.firstVisibleItemIndex == 0 &&
+                        listState.firstVisibleItemScrollOffset == 0
+
+                val canCollapse = available.y < 0f && !isCollapsed
+                val canExpand = available.y > 0f && isAtTop && isCollapsed
+
+                return when {
+                    canCollapse -> {
+                        accumulatedDrag[0] += available.y
+                        if (accumulatedDrag[0] < -DRAG_THRESHOLD) {
+                            viewModel.onEvent(TaskCalendarEvent.SetCalendarCollapsed(true))
+                            accumulatedDrag[0] = 0f
+                        }
+                        available
+                    }
+
+                    canExpand -> {
+                        accumulatedDrag[0] += available.y
+                        if (accumulatedDrag[0] > DRAG_THRESHOLD) {
+                            viewModel.onEvent(TaskCalendarEvent.SetCalendarCollapsed(false))
+                            accumulatedDrag[0] = 0f
+                        }
+                        available
+                    }
+
+                    else -> Offset.Zero
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.onEvent(
+            TaskCalendarEvent.ChangeVisibleMonth(pageToMonth(pagerState.currentPage))
         )
+    }
+
+    LaunchedEffect(state.visibleMonth) {
+        val targetPage = monthToPage(state.visibleMonth)
+        if (pagerState.currentPage != targetPage) {
+            pagerState.animateScrollToPage(targetPage)
+        }
+    }
+
+    val categoryColors = remember(state.categories) {
+        state.categories.associate { it.id to Color(it.color) }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(CalendarBackground)
+            .nestedScroll(nestedScrollConnection)
     ) {
-        // Calendar Header with Month/Year selector
-        CalendarHeader(
-            yearMonth = selectedMonth,
-            onPreviousMonth = { selectedMonth = selectedMonth.minusMonths(1) },
-            onNextMonth = { selectedMonth = selectedMonth.plusMonths(1) }
-        )
+        Box(
+            modifier = Modifier
+                .padding(start = 12.dp, end = 12.dp, top = 12.dp)
+                .fillMaxWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        stiffness = Spring.StiffnessLow,
+                        dampingRatio = Spring.DampingRatioLowBouncy
+                    )
+                )
+                .border(1.dp, CalendarBorderColor.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
+                .background(Color.White, RoundedCornerShape(24.dp))
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragStart = { accumulatedDrag[0] = 0f },
+                        onVerticalDrag = { _, dragAmount -> accumulatedDrag[0] += dragAmount },
+                        onDragEnd = {
+                            when {
+                                accumulatedDrag[0] < -DRAG_THRESHOLD && !isCollapsed ->
+                                    viewModel.onEvent(TaskCalendarEvent.SetCalendarCollapsed(true))
 
-        // Calendar Grid
-        CalendarGrid(
-            yearMonth = selectedMonth,
-            selectedDate = selectedDate,
-            onDateSelected = { selectedDate = it },
-            tasksMap = mockTasks
-        )
+                                accumulatedDrag[0] > DRAG_THRESHOLD && isCollapsed ->
+                                    viewModel.onEvent(TaskCalendarEvent.SetCalendarCollapsed(false))
+                            }
+                            accumulatedDrag[0] = 0f
+                        },
+                        onDragCancel = { accumulatedDrag[0] = 0f }
+                    )
+                }
+        ) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Top) {
+                CalendarHeader(
+                    yearMonth = state.visibleMonth,
+                    onPreviousMonth = {
+                        viewModel.onEvent(
+                            TaskCalendarEvent.ChangeVisibleMonth(
+                                state.visibleMonth.minusMonths(
+                                    1
+                                )
+                            )
+                        )
+                    },
+                    onNextMonth = {
+                        viewModel.onEvent(
+                            TaskCalendarEvent.ChangeVisibleMonth(
+                                state.visibleMonth.plusMonths(
+                                    1
+                                )
+                            )
+                        )
+                    }
+                )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) { page ->
+                    val month = pageToMonth(page)
+                    MonthGrid(
+                        month = month,
+                        selectedDate = state.selectedDate,
+                        daysWithTasks = state.daysWithTasks,
+                        isCollapsed = state.isCalendarCollapsed,
+                        onDateTap = { tappedDate ->
+                            val targetMonth = YearMonth.from(tappedDate)
+                            if (targetMonth != month) {
+                                val pageDelta = monthDistance(month, targetMonth)
+                                viewModel.onEvent(TaskCalendarEvent.SelectSummaryDate(tappedDate))
+                                viewModel.onEvent(TaskCalendarEvent.ChangeVisibleMonth(targetMonth))
+                                scope.launch {
+                                    pagerState.animateScrollToPage(page + pageDelta)
+                                }
+                            } else {
+                                viewModel.onEvent(TaskCalendarEvent.ToggleDateSelection(tappedDate))
+                            }
+                            onDateClick(tappedDate.atStartOfDay(ZoneId.systemDefault())
+                                .toInstant()
+                                .toEpochMilli())
+                        }
+                    )
+                }
+            }
+        }
 
-        // Tasks for selected date
-        TasksForDate(
-            date = selectedDate,
-            tasks = mockTasks[selectedDate] ?: emptyList(),
-            onTaskClick = onTaskClick
-        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (state.selectedDate != null) {
+                if (state.selectedDayTaskItems.isEmpty()) {
+                    item {
+                        EmptyTasksPlaceholder(selectedDate = state.selectedDate!!)
+                    }
+                } else {
+                    items(state.selectedDayTaskItems, key = { it.task.id }) { taskItem ->
+                        TaskItemCard(
+                            modifier = Modifier
+                                .padding(start = 3.dp)
+                                .drawBehind {
+                                    val color = categoryColors[taskItem.task.categoryId]
+                                        ?: FallbackCategoryColor
+                                    val radius = 15.dp.toPx()
+                                    val strokeWidth = 6.dp.toPx()
+                                    drawLine(
+                                        color = color,
+                                        start = Offset(x = 0f, y = radius),
+                                        end = Offset(x = 0f, y = size.height - radius),
+                                        strokeWidth = strokeWidth
+                                    )
+                                    drawArc(
+                                        color = color,
+                                        startAngle = 180f,
+                                        sweepAngle = -60f,
+                                        useCenter = false,
+                                        topLeft = Offset(x = 0f, y = size.height - radius * 2 - strokeWidth / 3),
+                                        size = Size(radius * 2, radius * 2),
+                                        style = Stroke(width = strokeWidth)
+                                    )
+                                    drawArc(
+                                        color = color,
+                                        startAngle = 180f,
+                                        sweepAngle = 60f,
+                                        useCenter = false,
+                                        topLeft = Offset(x = 0f, y = strokeWidth / 3),
+                                        size = Size(radius * 2, radius * 2),
+                                        style = Stroke(width = strokeWidth)
+                                    )
+                                },
+                            taskItem = taskItem,
+                            isSelectionMode = false,
+                            isSelected = false,
+                            isAnimatingCompletion = taskItem.task.id in state.animatingTaskIds,
+                            isShowingSubtasks = false,
+                            isPriorityMenuExpanded = state.activePriorityTaskId == taskItem.task.id,
+                            onClick = { onTaskClick(taskItem.task.id) },
+                            onCompletionClick = {
+                                viewModel.onEvent(
+                                    TaskCalendarEvent.ToggleTaskCompletion(
+                                        taskItem.task
+                                    )
+                                )
+                            },
+                            onPriorityClick = {
+                                viewModel.onEvent(TaskCalendarEvent.OpenPriorityMenu(taskItem.task.id))
+                            },
+                            onPriorityDismiss = {
+                                viewModel.onEvent(TaskCalendarEvent.DismissPriorityMenu)
+                            },
+                            onPrioritySelected = { priority ->
+                                viewModel.onEvent(
+                                    TaskCalendarEvent.SetTaskPriority(
+                                        taskItem.task.id,
+                                        priority
+                                    )
+                                )
+                            },
+                            onSubtaskCompletionClick = {}
+                        )
+                    }
+                }
+            } else {
+                if (state.monthSummaries.isEmpty()) {
+                    item {
+                        EmptyMonthSummaryPlaceholder(month = state.visibleMonth)
+                    }
+                } else {
+                    items(state.monthSummaries, key = { it.date.toEpochDay() }) { summary ->
+                        DaySummaryCard(
+                            summary = summary,
+                            onClick = {
+                                viewModel.onEvent(TaskCalendarEvent.SelectSummaryDate(summary.date))
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun CalendarHeader(
+private fun CalendarHeader(
     yearMonth: YearMonth,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit
@@ -112,11 +348,10 @@ fun CalendarHeader(
         }
 
         Text(
-            text = "${yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).uppercase()} ${yearMonth.year}",
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
+            text = "${
+                yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).uppercase()
+            } ${yearMonth.year}",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
         )
 
         IconButton(onClick = onNextMonth) {
@@ -126,69 +361,67 @@ fun CalendarHeader(
 }
 
 @Composable
-fun CalendarGrid(
-    yearMonth: YearMonth,
-    selectedDate: LocalDate,
-    onDateSelected: (LocalDate) -> Unit,
-    tasksMap: Map<LocalDate, List<Task>>
+private fun MonthGrid(
+    month: YearMonth,
+    selectedDate: LocalDate?,
+    daysWithTasks: Set<LocalDate>,
+    isCollapsed: Boolean,
+    onDateTap: (LocalDate) -> Unit
 ) {
+    val days = remember(month) { buildMonthCells(month) }
+    val weekCount = remember(days) { days.size / 7 }
+    val selectedWeekIndex = remember(month, selectedDate) {
+        val weekAnchorDate = selectedDate
+            ?.takeIf { YearMonth.from(it) == month }
+            ?: month.atDay(1)
+        (days.indexOf(weekAnchorDate) / 7).coerceAtLeast(0)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.Top
     ) {
-        // Day headers
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { day ->
+            listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { day ->
                 Text(
                     text = day,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
-                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.Gray
+                    color = Color(0xFF98A2B3)
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Calendar dates
-        val firstDayOfMonth = yearMonth.atDay(1)
-        val firstDayOfWeek = firstDayOfMonth.dayOfWeek.value % 7 // Sunday = 0
-        val daysInMonth = yearMonth.lengthOfMonth()
+        val weekRange = if (isCollapsed) {
+            selectedWeekIndex..selectedWeekIndex
+        } else {
+            0 until weekCount
+        }
 
-        var dayCounter = 1
-        for (week in 0 until 6) {
-            if (dayCounter > daysInMonth) break
-
+        weekRange.forEach { week ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                for (dayOfWeek in 0 until 7) {
-                    val dayIndex = week * 7 + dayOfWeek
-                    if (dayIndex < firstDayOfWeek || dayCounter > daysInMonth) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    } else {
-                        val date = yearMonth.atDay(dayCounter)
-                        val hasTask = tasksMap.containsKey(date)
-                        val isSelected = date == selectedDate
-                        val isToday = date == LocalDate.now()
-
-                        CalendarDay(
-                            day = dayCounter,
-                            isSelected = isSelected,
-                            isToday = isToday,
-                            hasTask = hasTask,
-                            onClick = { onDateSelected(date) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        dayCounter++
-                    }
+                for (weekDay in 0..6) {
+                    val date = days[(week * 7) + weekDay]
+                    CalendarDay(
+                        date = date,
+                        inCurrentMonth = YearMonth.from(date) == month,
+                        isSelected = date == selectedDate,
+                        isToday = date == LocalDate.now(),
+                        hasTask = date in daysWithTasks,
+                        onClick = { onDateTap(date) },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -197,8 +430,9 @@ fun CalendarGrid(
 }
 
 @Composable
-fun CalendarDay(
-    day: Int,
+private fun CalendarDay(
+    date: LocalDate,
+    inCurrentMonth: Boolean,
     isSelected: Boolean,
     isToday: Boolean,
     hasTask: Boolean,
@@ -212,7 +446,7 @@ fun CalendarDay(
             .background(
                 color = when {
                     isSelected -> Color(0xFF6B93F2)
-                    isToday -> Color(0xFFE3F2FD)
+                    isToday -> TodayBackground
                     else -> Color.Transparent
                 },
                 shape = CircleShape
@@ -225,21 +459,21 @@ fun CalendarDay(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = day.toString(),
-                fontSize = 14.sp,
+                text = date.dayOfMonth.toString(),
                 color = when {
                     isSelected -> Color.White
-                    isToday -> Color(0xFF1976D2)
-                    else -> Color.Black
+                    isToday -> TodayText
+                    !inCurrentMonth -> Color(0xFFB5B8C5)
+                    else -> Color(0xFF101828)
                 },
                 fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
             )
-            if (hasTask && !isSelected) {
+            if (hasTask) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
                         .size(4.dp)
-                        .background(Color(0xFF6B93F2), CircleShape)
+                        .background(if (isSelected) Color.White else Color(0xFF6B93F2), CircleShape)
                 )
             }
         }
@@ -247,110 +481,115 @@ fun CalendarDay(
 }
 
 @Composable
-fun TasksForDate(
-    date: LocalDate,
-    tasks: List<Task>,
-    onTaskClick: (Int) -> Unit = {}
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (tasks.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No tasks for this day",
-                        color = Color.Gray,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-        } else {
-            items(tasks) { task ->
-                CalendarTaskCard(
-                    task = task,
-                    onClick = { onTaskClick(task.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun CalendarTaskCard(
-    task: Task,
-    onClick: () -> Unit = {}
+private fun DaySummaryCard(
+    summary: CalendarDaySummary,
+    onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable(onClick = onClick)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth()
+                .padding(14.dp)
         ) {
-            // Blue accent bar
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(40.dp)
-                    .background(Color(0xFF6B93F2), RoundedCornerShape(2.dp))
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Task title and time
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = task.title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.Black
-                )
-                task.startAt?.let { startTime ->
-                    val hours = (startTime / 3600000).toInt()
-                    val minutes = ((startTime % 3600000) / 60000).toInt()
-                    Text(
-                        text = String.format(Locale.getDefault(), "%02d:%02d", hours, minutes),
-                        fontSize = 12.sp,
-                        color = Color(0xFFE57373)
+            Text(
+                text = summary.date.format(
+                    DateTimeFormatter.ofPattern(
+                        "EEE, dd MMM",
+                        Locale.getDefault()
                     )
-                }
-            }
-
-            // Notification icon
-            Icon(
-                imageVector = Icons.Outlined.Notifications,
-                contentDescription = "Notification",
-                tint = Color.Gray,
-                modifier = Modifier.size(20.dp)
+                ),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF101828)
             )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Status icon placeholder
-            Icon(
-                imageVector = Icons.Outlined.CheckCircle,
-                contentDescription = "Status",
-                tint = Color.Gray,
-                modifier = Modifier.size(20.dp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "${summary.totalCount} tasks",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF475467)
+            )
+            Text(
+                text = "${summary.completedCount} completed",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF667085)
             )
         }
     }
+}
+
+@Composable
+private fun EmptyTasksPlaceholder(selectedDate: LocalDate) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "No tasks for ${
+                selectedDate.format(
+                    DateTimeFormatter.ofPattern(
+                        "EEE, dd MMM",
+                        Locale.getDefault()
+                    )
+                )
+            }",
+            color = Color(0xFF667085),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun EmptyMonthSummaryPlaceholder(month: YearMonth) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "No task days in ${
+                month.month.getDisplayName(
+                    TextStyle.FULL,
+                    Locale.getDefault()
+                )
+            }",
+            color = Color(0xFF667085),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+private fun pageToMonth(page: Int): YearMonth {
+    return YearMonth.now().plusMonths((page - INITIAL_PAGER_PAGE).toLong())
+}
+
+private fun monthToPage(month: YearMonth): Int {
+    return INITIAL_PAGER_PAGE + monthDistance(YearMonth.now(), month)
+}
+
+private fun monthDistance(from: YearMonth, to: YearMonth): Int {
+    return ((to.year - from.year) * 12) + (to.monthValue - from.monthValue)
+}
+
+private fun buildMonthCells(month: YearMonth): List<LocalDate> {
+    val firstDay = month.atDay(1)
+    val firstCell = firstDay.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    val lastDay = month.atEndOfMonth()
+    val lastCell = lastDay.with(TemporalAdjusters.nextOrSame(java.time.DayOfWeek.SUNDAY))
+    val visibleDays = java.time.temporal.ChronoUnit.DAYS.between(firstCell, lastCell).toInt() + 1
+    return List(visibleDays) { firstCell.plusDays(it.toLong()) }
+}
+
+private fun monthWeekCount(month: YearMonth): Int {
+    return buildMonthCells(month).size / 7
 }
 
 @Preview(showBackground = true, apiLevel = 34)

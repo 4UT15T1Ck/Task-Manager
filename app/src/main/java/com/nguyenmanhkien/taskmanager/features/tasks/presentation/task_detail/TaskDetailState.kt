@@ -8,6 +8,7 @@ data class TaskDetailState(
 	val taskWithSubtasks: TaskWithSubtasks? = null,
 	val categories: List<Category> = emptyList(),
 	val isMenuExpanded: Boolean = false,
+	val isDeletionRequest: Boolean = false,
 	val isCategoryPickerVisible: Boolean = false,
 	val activePickerSection: TaskDetailPickerSection? = null,
 	val isDescriptionEditorVisible: Boolean = false,

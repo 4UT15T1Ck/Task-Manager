@@ -112,7 +112,8 @@ fun TaskDetailScreen(
     val contentScrollState = rememberScrollState()
 
     val subtaskFocusRequesters = remember { mutableStateMapOf<Int, FocusRequester>() }
-    val subtaskBringIntoViewRequesters = remember { mutableStateMapOf<Int, BringIntoViewRequester>() }
+    val subtaskBringIntoViewRequesters =
+        remember { mutableStateMapOf<Int, BringIntoViewRequester>() }
     val subtaskIds = remember(taskWithSubtasks.subtasks) { taskWithSubtasks.subtasks.map { it.id } }
     LaunchedEffect(state.pendingSubtaskFocusId, subtaskIds) {
         val subtaskId = state.pendingSubtaskFocusId ?: return@LaunchedEffect
@@ -168,8 +169,12 @@ fun TaskDetailScreen(
                         onClick = { viewModel.onEvent(TaskDetailEvent.ToggleTaskCompletion) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Duplicate") },
+                        text = { Text("Make a Copy") },
                         onClick = { viewModel.onEvent(TaskDetailEvent.DuplicateTask) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = { viewModel.onEvent(TaskDetailEvent.RequestTaskDeletion) }
                     )
                 }
             }
@@ -541,6 +546,38 @@ fun TaskDetailScreen(
                     ) {
                         TextButton(onClick = { viewModel.onEvent(TaskDetailEvent.HidePickerDialog) }) {
                             Text("Done")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (state.isDeletionRequest) {
+        Dialog(
+            onDismissRequest = { viewModel.onEvent(TaskDetailEvent.CancelTaskDeletion) },
+            properties = DialogProperties(
+                dismissOnClickOutside = true
+            )
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .heightIn(max = 760.dp)
+            ) {
+                Column (modifier = Modifier.padding(16.dp)) {
+                    Text("Are you sure you want to delete this task?")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { viewModel.onEvent(TaskDetailEvent.CancelTaskDeletion) }) {
+                            Text("Cancel")
+                        }
+                        TextButton(onClick = { viewModel.onEvent(TaskDetailEvent.ConfirmTaskDeletion) }) {
+                            Text("Delete")
                         }
                     }
                 }

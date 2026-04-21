@@ -8,9 +8,9 @@ sealed class TaskDialogEvent {
     data class EnterTitle(val value: String) : TaskDialogEvent()
     data class ChangeTitleFocus(val focusState: FocusState) : TaskDialogEvent()
 
-
     // Task property events
-    data class SetInitialCategoryId(val categoryId: Int?) : TaskDialogEvent()
+    data class SetInitialCategoryId(val categoryId: Int) : TaskDialogEvent()
+    data class SetInitialDate(val timestamp: Long) : TaskDialogEvent()
     data class SelectPriority(val priority: TaskPriority) : TaskDialogEvent()
     data class SelectCategory(val categoryId: Int?) : TaskDialogEvent()
     data object ToggleCategoryPicker : TaskDialogEvent()

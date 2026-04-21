@@ -5,6 +5,8 @@ import androidx.room.Delete
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.CategoryTaskCount
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.DayTaskSummary
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.SyncStatus
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
@@ -50,6 +52,16 @@ interface TaskDao {
                 "ORDER BY ${Task.CREATED_AT_COLUMN} ASC"
     )
     fun getSubtasksForTaskFlow(taskId: Int): Flow<List<Task>>
+
+    @Query(
+        "SELECT ${Task.CATEGORY_ID_COLUMN} AS categoryId, COUNT(${Task.ID_COLUMN}) AS taskCount" +
+                " FROM ${Task.TABLE_NAME}" +
+                " WHERE ${Task.PARENT_ID_COLUMN} IS NULL" +
+                " AND ${Task.CATEGORY_ID_COLUMN} IS NOT NULL" +
+                " AND ${Task.SYNC_STATUS_COLUMN} != 'DELETED'" +
+                " GROUP BY ${Task.CATEGORY_ID_COLUMN}"
+    )
+    fun getParentTaskCountsByCategory(): Flow<List<CategoryTaskCount>>
 
     @Transaction
     @Query(
@@ -119,6 +131,16 @@ interface TaskDao {
 
 
     @Query(
+        "SELECT * FROM ${Task.TABLE_NAME}" +
+                " WHERE ${Task.DUE_AT_COLUMN} >= :startTime " +
+                "AND ${Task.START_AT_COLUMN} <= :endTime " +
+                "AND ${Task.PARENT_ID_COLUMN} IS NULL " +
+                "AND ${Task.SYNC_STATUS_COLUMN} != 'DELETED' " +
+                "ORDER BY ${Task.START_AT_COLUMN} ASC"
+    )
+    fun getParentTasksInRange(startTime: Long, endTime: Long): Flow<List<Task>>
+
+    @Query(
         "WITH RECURSIVE DateRange(day) AS (" +
                 "SELECT :startTime " +
                 "UNION ALL " +
@@ -127,9 +149,29 @@ interface TaskDao {
                 "WHERE EXISTS (" +
                 "SELECT 1 FROM ${Task.TABLE_NAME}" +
                 " WHERE ${Task.START_AT_COLUMN} <= (day + 86399999) AND ${Task.DUE_AT_COLUMN} >= day" +
+                " AND ${Task.PARENT_ID_COLUMN} IS NULL " +
                 " AND ${Task.SYNC_STATUS_COLUMN} != 'DELETED' )"
     )
     fun getDaysWithTasksInRange(startTime: Long, endTime: Long): Flow<List<Long>>
+
+    @Query(
+        "WITH RECURSIVE DateRange(day) AS (" +
+                "SELECT :startTime " +
+                "UNION ALL " +
+                "SELECT day + 86400000 FROM DateRange WHERE day < :endTime" +
+                ") " +
+                "SELECT day AS dayStart, " +
+                "COUNT(${Task.ID_COLUMN}) AS totalCount, " +
+                "SUM(CASE WHEN ${Task.STATUS_COLUMN} = 'COMPLETED' THEN 1 ELSE 0 END) AS completedCount " +
+                "FROM DateRange LEFT JOIN ${Task.TABLE_NAME} " +
+                "ON ${Task.START_AT_COLUMN} <= (day + 86399999) " +
+                "AND ${Task.DUE_AT_COLUMN} >= day " +
+                "AND ${Task.PARENT_ID_COLUMN} IS NULL " +
+                "AND ${Task.SYNC_STATUS_COLUMN} != 'DELETED' " +
+                "GROUP BY day HAVING totalCount > 0 " +
+                "ORDER BY day ASC"
+    )
+    fun getDayTaskSummariesInRange(startTime: Long, endTime: Long): Flow<List<DayTaskSummary>>
 
     @Query(
         "UPDATE ${Task.TABLE_NAME}" +

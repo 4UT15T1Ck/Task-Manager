@@ -5,5 +5,6 @@ import org.koin.core.annotation.Single
 @Single
 data class CalendarUseCases(
     val getTasksInDay: GetTasksInDay,
-    val getDaysWithTask: GetDaysWithTask
+    val getDaysWithTask: GetDaysWithTask,
+    val getTaskDaySummaries: GetTaskDaySummaries
 )

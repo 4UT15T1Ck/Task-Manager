@@ -5,6 +5,9 @@ sealed class TaskDetailEvent {
 	data object DismissMenu : TaskDetailEvent()
 	data object ToggleTaskCompletion : TaskDetailEvent()
 	data object DuplicateTask : TaskDetailEvent()
+	data object RequestTaskDeletion : TaskDetailEvent()
+	data object CancelTaskDeletion : TaskDetailEvent()
+	data object ConfirmTaskDeletion : TaskDetailEvent()
 
 	data object ToggleCategoryPicker : TaskDetailEvent()
 	data class SelectCategory(val categoryId: Int?) : TaskDetailEvent()

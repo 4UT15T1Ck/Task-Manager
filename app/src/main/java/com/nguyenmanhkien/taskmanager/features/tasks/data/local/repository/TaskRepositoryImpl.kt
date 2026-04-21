@@ -1,6 +1,7 @@
 package com.nguyenmanhkien.taskmanager.features.tasks.data.local.repository
 
 import com.nguyenmanhkien.taskmanager.features.tasks.data.local.dao.TaskDao
+import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.DayTaskSummary
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.SyncStatus
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.Task
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskPriority
@@ -9,10 +10,16 @@ import com.nguyenmanhkien.taskmanager.features.tasks.domain.model.TaskWithSubtas
 import com.nguyenmanhkien.taskmanager.features.tasks.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 class TaskRepositoryImpl(
     private val dao: TaskDao
 ) : TaskRepository {
+
+    override fun getParentTaskCountsByCategory(): Flow<Map<Int, Int>> {
+        return dao.getParentTaskCountsByCategory()
+            .map { counts -> counts.associate { it.categoryId to it.taskCount } }
+    }
 
     override fun getFilteredTasks(
         categoryId: Int?,
@@ -41,6 +48,12 @@ class TaskRepositoryImpl(
 
     override fun getDaysWithTasks(startTime: Long, endTime: Long): Flow<List<Long>> =
         dao.getDaysWithTasksInRange(startTime, endTime)
+
+    override fun getParentTasksInRange(startTime: Long, endTime: Long): Flow<List<Task>> =
+        dao.getParentTasksInRange(startTime, endTime)
+
+    override fun getDayTaskSummariesInRange(startTime: Long, endTime: Long): Flow<List<DayTaskSummary>> =
+        dao.getDayTaskSummariesInRange(startTime, endTime)
 
     override suspend fun getSubtasksOnce(taskId: Int): List<Task> =
         dao.getSubtasksForTaskOnce(taskId)

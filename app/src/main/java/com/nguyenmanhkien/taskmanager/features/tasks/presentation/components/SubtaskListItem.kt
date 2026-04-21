@@ -1,4 +1,4 @@
-package com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.components
+package com.nguyenmanhkien.taskmanager.features.tasks.presentation.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row

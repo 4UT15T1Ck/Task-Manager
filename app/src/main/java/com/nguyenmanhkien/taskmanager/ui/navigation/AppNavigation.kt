@@ -39,6 +39,7 @@ import androidx.navigation.navArgument
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_calendar.TaskCalendarScreen
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_dialog.AddTaskDialog
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_detail.TaskDetailScreen
+import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.CategoryScreen
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.TaskListScreen
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.TaskListViewModel
 import com.nguyenmanhkien.taskmanager.features.tasks.presentation.task_list.TaskSelectionScreen
@@ -55,6 +56,7 @@ fun AppNavigation() {
 
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
+    var selectedDateAt by remember { mutableStateOf<Long?>(null) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -171,7 +173,10 @@ fun AppNavigation() {
                             navController.navigate(
                                 Screen.TaskDetailScreen.route + "?taskId=$taskId"
                             )
-                        }
+                        },
+                        onDateClick = { date ->
+                            selectedDateAt = date
+                        },
                     )
                 }
 
@@ -221,7 +226,8 @@ fun AppNavigation() {
 
                 // Category Management Screen
                 composable(route = Screen.CategoryManagementScreen.route) {
-                    CategoryManagementScreen(
+                    CategoryScreen(
+                        viewModel = taskListViewModel,
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
@@ -235,7 +241,8 @@ fun AppNavigation() {
                     showAddTaskDialog = false
                     selectedCategoryId = null
                 },
-                initialCategoryId = selectedCategoryId
+                initialCategoryId = selectedCategoryId,
+                initialDateAt = if (selectedBottomNavIndex == 2) selectedDateAt else null
             )
         }
     }
@@ -268,18 +275,6 @@ fun AccountScreen(
     }
 }
 
-@Composable
-@Suppress("UNUSED_PARAMETER")
-fun CategoryManagementScreen(
-    onNavigateBack: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Category Management Screen")
-    }
-}
 
 @Composable
 fun TaskManagerBottomBar(
